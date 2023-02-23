@@ -1,7 +1,14 @@
 import os
 import glob
-import numpy as np
+import logging
+
+import docopt
 import cv2 as cv
+import numpy as np
+
+
+logger = logging.getLogger('glaucoma')
+logging.basicConfig(level=logging.DEBUG)
 
 
 def projective_transformation(src):
@@ -35,6 +42,7 @@ def projective_transformation(src):
     dst = cv.warpPerspective(src, M, (rows, cols))
 
     return dst
+
 
 def spatial_filter_smoothing(src, kernel):
     # Opening / Closing
@@ -99,12 +107,14 @@ def homomorphic_filter(src, D0):
 
     return dst
 
+
 def inpainting(src):
     # gray processing (gray image)
     gray = cv.cvtColor(src, cv.COLOR_BGR2GRAY)
 
     # # Detect hole (circle)
-    circle = cv.HoughCircles(gray, cv.HOUGH_GRADIENT, dp=1, minDist=50, param1=50, param2=30, minRadius=15, maxRadius=30)
+    circle = cv.HoughCircles(gray, cv.HOUGH_GRADIENT, dp=1, minDist=50, param1=50, param2=30,
+                             minRadius=15, maxRadius=30)
     circle = np.uint8(circle)
 
     # Create mask of hole (hole = white, other = black)
@@ -118,43 +128,50 @@ def inpainting(src):
     return dst
 
 
+def main():
 
-if not os.path.exists("./Results"):
-    os.makedirs("./Results")
+    args = docopt.docopt(__doc__)
 
-img_path = []
-img_path.extend(glob.glob(os.path.join("./test_images/", "*.jpg")))
+    if not os.path.exists("./Results"):
+        os.makedirs("./Results")
 
-for path in img_path:
-    img = cv.imread(path)
+    img_path = []
+    img_path.extend(glob.glob(os.path.join("./test_images/", "*.jpg")))
 
-    img = projective_transformation(img)
+    for path in img_path:
+        img = cv.imread(path)
 
-    (b, g, r) = cv.split(img)
+        img = projective_transformation(img)
 
-    kernel = np.ones((3, 3), np.uint8)
-    b = spatial_filter_smoothing(b, kernel=kernel)
-    g = spatial_filter_smoothing(g, kernel=kernel)
-    kernel = np.ones((5, 5), np.uint8)
-    r = spatial_filter_smoothing(r, kernel=kernel)
+        (b, g, r) = cv.split(img)
 
-    img = cv.merge((b, g, r))
+        kernel = np.ones((3, 3), np.uint8)
+        b = spatial_filter_smoothing(b, kernel=kernel)
+        g = spatial_filter_smoothing(g, kernel=kernel)
+        kernel = np.ones((5, 5), np.uint8)
+        r = spatial_filter_smoothing(r, kernel=kernel)
 
-    img = spatial_filter_sharpening(img)
+        img = cv.merge((b, g, r))
 
-    (b, g, r) = cv.split(img)
+        img = spatial_filter_sharpening(img)
 
-    clahe = cv.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-    b = clahe.apply(b)
-    g = clahe.apply(g)
-    # r = clahe.apply(r)
+        (b, g, r) = cv.split(img)
 
-    # b = homomorphic_filter(b, D0=1)
-    g = homomorphic_filter(g, D0=1)
-    r = homomorphic_filter(r, D0=1)
+        clahe = cv.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+        b = clahe.apply(b)
+        g = clahe.apply(g)
+        # r = clahe.apply(r)
 
-    img = cv.merge((b, g, r))
-    print(path)
-    img = inpainting(img)
+        # b = homomorphic_filter(b, D0=1)
+        g = homomorphic_filter(g, D0=1)
+        r = homomorphic_filter(r, D0=1)
 
-    cv.imwrite(path.replace("test_images", "Results", 1), img)
+        img = cv.merge((b, g, r))
+        print(path)
+        img = inpainting(img)
+
+        cv.imwrite(path.replace("test_images", "Results", 1), img)
+
+
+if __name__ == '__main__':
+    main()
