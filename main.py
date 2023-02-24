@@ -64,8 +64,13 @@ def gaussian_filter(img):
 
 
 def morph_close(img):
-    kernel = np.ones((5, 5), np.uint8)
+    kernel = np.ones((3, 3), np.uint8)
     return cv.morphologyEx(img, cv.MORPH_CLOSE, kernel)
+
+
+def dilate(img):
+    kernel = np.ones((2, 2), np.uint8)
+    return cv.dilate(img, kernel, iterations=1)
 
 
 def morph_open(img):
@@ -132,6 +137,15 @@ def homomorphic_filter(src, D0):
     return dst
 
 
+def clahe(img):
+    (b, g, r) = cv.split(img)
+    clahe = cv.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    b = clahe.apply(b)
+    g = clahe.apply(g)
+    r = clahe.apply(r)
+    return cv.merge((b, g, r))
+
+
 def inpainting(src):
     # gray processing (gray image)
     gray = cv.cvtColor(src, cv.COLOR_BGR2GRAY)
@@ -170,7 +184,11 @@ def main():
 
         # img = projective_transformation(img)
 
-        img = erode(img)
+        # img = erode(img)
+
+        # img = morph_close(img)
+
+        img = dilate(img)
 
         # (b, g, r) = cv.split(img)
         # kernel = np.ones((3, 3), np.uint8)
@@ -182,21 +200,18 @@ def main():
 
         # img = spatial_filter_sharpening(img)
 
-        # (b, g, r) = cv.split(img)
-        # clahe = cv.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-        # b = clahe.apply(b)
-        # g = clahe.apply(g)
-        # # r = clahe.apply(r)
-        # # b = homomorphic_filter(b, D0=1)
+        # b = homomorphic_filter(b, D0=1)
         # g = homomorphic_filter(g, D0=1)
         # r = homomorphic_filter(r, D0=1)
         # img = cv.merge((b, g, r))
 
-        # try:
-        #     img = inpainting(img)
-        # except TypeError:
-        #     logger.error(f'failed to find circle in {fname=}')
-        #     continue
+        try:
+            img = inpainting(img)
+        except TypeError:
+            logger.error(f'failed to find circle in {fname=}')
+            continue
+
+        img = clahe(img)
 
         fname = output_path.joinpath(path.name).as_posix()
         cv.imwrite(fname, img)
