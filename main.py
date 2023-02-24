@@ -140,8 +140,8 @@ def homomorphic_filter(src, D0):
 def clahe(img):
     (b, g, r) = cv.split(img)
     clahe = cv.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-    b = clahe.apply(b)
-    g = clahe.apply(g)
+    # b = clahe.apply(b)
+    # g = clahe.apply(g)
     r = clahe.apply(r)
     return cv.merge((b, g, r))
 
@@ -182,8 +182,6 @@ def main():
         fname = path.as_posix()
         img = cv.imread(fname)
 
-        # img = projective_transformation(img)
-
         # img = erode(img)
 
         # img = morph_close(img)
@@ -209,7 +207,10 @@ def main():
             img = inpainting(img)
         except TypeError:
             logger.error(f'failed to find circle in {fname=}')
-            continue
+
+        # img = bilateral_filter(img)
+
+        # img = projective_transformation(img)
 
         img = clahe(img)
 
