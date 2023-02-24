@@ -1,6 +1,17 @@
-import os
-import glob
+'''prepare glaucoma images to improve predictions
+
+usage:
+  glaucoma [-i input] [-o output]
+  glaucoma -h
+
+OPTIONS:
+  -h --help             show this help message.
+  -i --input=INPUT      input directory [default: test_images]
+  -o --output=OUTPUT    output directory [default: Results]
+'''
+from pathlib import Path
 import logging
+import sys
 
 import docopt
 import cv2 as cv
@@ -114,13 +125,15 @@ def inpainting(src):
 
     # # Detect hole (circle)
     circle = cv.HoughCircles(gray, cv.HOUGH_GRADIENT, dp=1, minDist=50, param1=50, param2=30,
-                             minRadius=15, maxRadius=30)
+                             minRadius=5, maxRadius=25)
     circle = np.uint8(circle)
 
     # Create mask of hole (hole = white, other = black)
     mask = np.zeros((256, 256), np.uint8)
     mask.fill(0)
-    cv.circle(mask, (circle[0, 0][0], circle[0, 0][1]), circle[0, 0][2]+5, (255, 255, 255), -1)
+    cv.circle(img=mask, center=(circle[0, 0][0], circle[0, 0][1]), radius=circle[0, 0][2]+5,
+              color=(255, 255, 255),
+              thickness=-1)  # filled
 
     # Inpainting
     dst = cv.inpaint(src, mask, inpaintRadius=100, flags=cv.INPAINT_TELEA)
@@ -132,45 +145,47 @@ def main():
 
     args = docopt.docopt(__doc__)
 
-    if not os.path.exists("./Results"):
-        os.makedirs("./Results")
+    input_path = Path(args['--input'])
+    output_path = Path(args['--output'])
+    output_path.mkdir(exist_ok=True)
+    logger.info(input_path.absolute())
 
-    img_path = []
-    img_path.extend(glob.glob(os.path.join("./test_images/", "*.jpg")))
+    for path in input_path.glob("*.jpg"):
+        logger.debug(f'processing {path=}')
+        fname = path.as_posix()
+        img = cv.imread(fname)
 
-    for path in img_path:
-        img = cv.imread(path)
+        # img = projective_transformation(img)
 
-        img = projective_transformation(img)
+        # (b, g, r) = cv.split(img)
+        # kernel = np.ones((3, 3), np.uint8)
+        # b = spatial_filter_smoothing(b, kernel=kernel)
+        # g = spatial_filter_smoothing(g, kernel=kernel)
+        # kernel = np.ones((5, 5), np.uint8)
+        # r = spatial_filter_smoothing(r, kernel=kernel)
+        # img = cv.merge((b, g, r))
 
-        (b, g, r) = cv.split(img)
+        # img = spatial_filter_sharpening(img)
 
-        kernel = np.ones((3, 3), np.uint8)
-        b = spatial_filter_smoothing(b, kernel=kernel)
-        g = spatial_filter_smoothing(g, kernel=kernel)
-        kernel = np.ones((5, 5), np.uint8)
-        r = spatial_filter_smoothing(r, kernel=kernel)
+        # (b, g, r) = cv.split(img)
+        # clahe = cv.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+        # b = clahe.apply(b)
+        # g = clahe.apply(g)
+        # # r = clahe.apply(r)
+        # # b = homomorphic_filter(b, D0=1)
+        # g = homomorphic_filter(g, D0=1)
+        # r = homomorphic_filter(r, D0=1)
+        # img = cv.merge((b, g, r))
 
-        img = cv.merge((b, g, r))
+        try:
+            img = inpainting(img)
+        except TypeError:
+            logger.error(f'failed to find circle in {fname=}')
+            continue
 
-        img = spatial_filter_sharpening(img)
-
-        (b, g, r) = cv.split(img)
-
-        clahe = cv.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-        b = clahe.apply(b)
-        g = clahe.apply(g)
-        # r = clahe.apply(r)
-
-        # b = homomorphic_filter(b, D0=1)
-        g = homomorphic_filter(g, D0=1)
-        r = homomorphic_filter(r, D0=1)
-
-        img = cv.merge((b, g, r))
-        print(path)
-        img = inpainting(img)
-
-        cv.imwrite(path.replace("test_images", "Results", 1), img)
+        fname = output_path.joinpath(path.name).as_posix()
+        cv.imwrite(fname, img)
+        logger.info(f'wrote image {fname=}')
 
 
 if __name__ == '__main__':
