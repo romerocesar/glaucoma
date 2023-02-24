@@ -55,23 +55,36 @@ def projective_transformation(src):
     return dst
 
 
-def spatial_filter_smoothing(src, kernel):
-    # Opening / Closing
-    dst = cv.morphologyEx(src, cv.MORPH_CLOSE, kernel)
-
-    # # Median filter
-    # dst = cv.medianBlur(src, 7)
-
-    # # Gaussian filter
-    # dst = cv.GaussianBlur(dst, (5, 5), 2, 2, borderType=cv.BORDER_DEFAULT)
-
-    # Bilateral filter
-    dst = cv.bilateralFilter(dst, 11, 75, 75, borderType=cv.BORDER_REPLICATE)
-
-    return dst
+def median_blur(img):
+    return cv.medianBlur(img, 7)
 
 
-# Sobel filter: not apply due to changes of original colors
+def gaussian_filter(img):
+    return cv.GaussianBlur(img, (5, 5), 2, 2, borderType=cv.BORDER_DEFAULT)
+
+
+def morph_close(img):
+    kernel = np.ones((5, 5), np.uint8)
+    return cv.morphologyEx(img, cv.MORPH_CLOSE, kernel)
+
+
+def morph_open(img):
+    kernel = np.ones((5, 5), np.uint8)
+    return cv.morphologyEx(img, cv.MORPH_OPEN, kernel)
+
+
+def bilateral_filter(img):
+    return cv.bilateralFilter(img, 11, 75, 75, borderType=cv.BORDER_REPLICATE)
+
+
+def erode(img):
+    b, g, r = cv.split(img)
+    kernel = np.ones((2, 2), np.uint8)
+    # b = cv.erode(b, kernel, iterations=1)
+    # g = cv.erode(g, kernel, iterations=1)
+    r = cv.erode(r, kernel, iterations=1)
+    return cv.merge((b, g, r))
+
 
 def spatial_filter_sharpening(src):
     # Laplacian filter
@@ -157,6 +170,8 @@ def main():
 
         # img = projective_transformation(img)
 
+        img = erode(img)
+
         # (b, g, r) = cv.split(img)
         # kernel = np.ones((3, 3), np.uint8)
         # b = spatial_filter_smoothing(b, kernel=kernel)
@@ -177,11 +192,11 @@ def main():
         # r = homomorphic_filter(r, D0=1)
         # img = cv.merge((b, g, r))
 
-        try:
-            img = inpainting(img)
-        except TypeError:
-            logger.error(f'failed to find circle in {fname=}')
-            continue
+        # try:
+        #     img = inpainting(img)
+        # except TypeError:
+        #     logger.error(f'failed to find circle in {fname=}')
+        #     continue
 
         fname = output_path.joinpath(path.name).as_posix()
         cv.imwrite(fname, img)
